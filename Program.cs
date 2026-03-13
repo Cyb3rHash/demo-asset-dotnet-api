@@ -7,10 +7,12 @@ using DemoAssetDotnetApi.Application.Assets;
 using DemoAssetDotnetApi.Domain.Errors;
 using DemoAssetDotnetApi.Infrastructure.Persistence;
 using FluentValidation;
+using FluentValidation.AspNetCore;
 using Hellang.Middleware.ProblemDetails;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
