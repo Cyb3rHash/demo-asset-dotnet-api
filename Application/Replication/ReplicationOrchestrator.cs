@@ -26,18 +26,16 @@ public sealed class ReplicationOrchestrator
         CopyLineageDto lineage,
         CancellationToken ct)
     {
-        """
-        Post-copy replication orchestrator.
-
-        Contract:
-        - Inputs: siteId, lineage (must include copyOperationId, sourceAssetId, targetAssetId, timestampUtc)
-        - Outputs: persisted ReplicationOutcomeDto with Status: Completed|Partial|Failed and per-module details.
-        - Errors: throws only on unexpected system failures; module failures are captured as Partial/Failed details.
-        - Side effects: persists EF mappings, throughput equation setups, and minimal Data Input values to the linked-module repository.
-
-        BRD link:
-        - Replication Result Status must be Completed/Partial/Failed with impacted module list (BRD §6.13).
-        """;
+        // Post-copy replication orchestrator.
+        //
+        // Contract:
+        // - Inputs: siteId, lineage (must include copyOperationId, sourceAssetId, targetAssetId, timestampUtc)
+        // - Outputs: persisted ReplicationOutcomeDto with Status: Completed|Partial|Failed and per-module details.
+        // - Errors: throws only on unexpected system failures; module failures are captured as Partial/Failed details.
+        // - Side effects: persists EF mappings, throughput equation setups, and minimal Data Input values to the linked-module repository.
+        //
+        // BRD link:
+        // - Replication Result Status must be Completed/Partial/Failed with impacted module list (BRD §6.13).
 
         // REQ: BRD-FR-03 - Copy Save must proceed save + replication and return transparent progress/outcome.
         _logger.LogInformation(

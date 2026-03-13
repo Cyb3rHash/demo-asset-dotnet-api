@@ -7,10 +7,12 @@ using DemoAssetDotnetApi.Application.Assets;
 using DemoAssetDotnetApi.Domain.Errors;
 using DemoAssetDotnetApi.Infrastructure.Persistence;
 using FluentValidation;
+using FluentValidation.AspNetCore;
 using Hellang.Middleware.ProblemDetails;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -90,8 +92,19 @@ builder.Services.AddProblemDetails(options =>
     });
 });
 
-// Swagger/OpenAPI
+/*
+ * Swagger/OpenAPI
+ *
+ * NOTE:
+ * We use Swashbuckle.AspNetCore.Filters' ExampleFilters. That package requires
+ * DI registrations for its internal filters/services. Without those registrations,
+ * the app throws at runtime when generating swagger, resulting in 500s.
+ */
 builder.Services.AddEndpointsApiExplorer();
+
+// Required registrations for Swashbuckle.AspNetCore.Filters' ExampleFilters()
+builder.Services.AddSwaggerExamplesFromAssemblyOf<SwaggerExamplesSchemaFilter>();
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
@@ -105,6 +118,7 @@ builder.Services.AddSwaggerGen(options =>
     options.EnableAnnotations();
     options.OperationFilter<CorrelationIdHeaderOperationFilter>();
     options.SchemaFilter<ValidationErrorDetailSchemaFilter>();
+    options.DocumentFilter<EnsureSchemaDocumentFilter>();
 
     // Standardized error envelope schema for swagger responses.
     options.MapType<ErrorResponse>(() => new OpenApiSchema

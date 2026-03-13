@@ -14,14 +14,30 @@ This container provides an **industry-standard API baseline** aligned to the BRD
 - .NET SDK 8.x
 
 ## Run locally
+
+From the repository root:
+
 ```bash
+cd demo-asset-dotnet-api_workspace/demo-asset-dotnet-api
 dotnet restore
 dotnet run
 ```
 
 Open:
-- Swagger UI: `http://localhost:5024/swagger`
-- Health: `http://localhost:5024/health`
+- Swagger UI: `http://localhost:3002/swagger`
+- Health: `http://localhost:3002/health`
+
+## Environment variables / .env manifest
+
+This container’s supported environment variables are documented here:
+
+- `ENVIRONMENT.md` (container-level env manifest)
+
+The source of truth for keys is:
+
+- `.env.example`
+
+> Note: Do not commit a real `.env`. Have the orchestrator/deployment system provide runtime values.
 
 ## Container-friendly port binding
 This API supports the common `PORT` environment variable.

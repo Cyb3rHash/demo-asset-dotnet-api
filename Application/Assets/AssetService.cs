@@ -223,7 +223,7 @@ public sealed class AssetService : IAssetService
                 fieldPath: "confirm");
         }
 
-        var mode = request.DeleteMode ?? SiteAssets.DeleteMode.Soft;
+        var mode = request.DeleteMode ?? DeleteMode.Soft;
 
         _logger.LogInformation(
             "AssetService.RemoveAsync start siteId={SiteId} assetId={AssetId} mode={Mode}",
@@ -232,7 +232,7 @@ public sealed class AssetService : IAssetService
             mode);
 
         bool deleted;
-        if (mode == SiteAssets.DeleteMode.Hard)
+        if (mode == DeleteMode.Hard)
         {
             deleted = await _repo.HardDeleteAsync(request.SiteId, request.AssetId, request.Reason, ct);
         }
@@ -252,7 +252,7 @@ public sealed class AssetService : IAssetService
             Result = new RemoveSiteAssetResultDto
             {
                 Status = "Deleted",
-                Message = mode == SiteAssets.DeleteMode.Hard ? "Asset hard deleted." : "Asset deleted (soft).",
+                Message = mode == DeleteMode.Hard ? "Asset hard deleted." : "Asset deleted (soft).",
                 BlockedBy = new List<DeleteBlockedByDto>()
             }
         };
