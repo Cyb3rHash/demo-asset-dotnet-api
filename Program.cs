@@ -92,8 +92,19 @@ builder.Services.AddProblemDetails(options =>
     });
 });
 
-// Swagger/OpenAPI
+/*
+ * Swagger/OpenAPI
+ *
+ * NOTE:
+ * We use Swashbuckle.AspNetCore.Filters' ExampleFilters. That package requires
+ * DI registrations for its internal filters/services. Without those registrations,
+ * the app throws at runtime when generating swagger, resulting in 500s.
+ */
 builder.Services.AddEndpointsApiExplorer();
+
+// Required registrations for Swashbuckle.AspNetCore.Filters' ExampleFilters()
+builder.Services.AddSwaggerExamplesFromAssemblyOf<SwaggerExamplesSchemaFilter>();
+
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo

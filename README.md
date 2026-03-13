@@ -24,8 +24,8 @@ dotnet run
 ```
 
 Open:
-- Swagger UI: `http://localhost:5024/swagger`
-- Health: `http://localhost:5024/health`
+- Swagger UI: `http://localhost:3002/swagger`
+- Health: `http://localhost:3002/health`
 
 ## Environment variables / .env manifest
 

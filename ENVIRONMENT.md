@@ -24,7 +24,7 @@ The source of truth for this container’s environment keys is:
 
 **Type:** integer (string in environment)  
 **Default:** not set (ASP.NET Core default hosting behavior applies)  
-**Example:** `PORT=8080`
+**Example:** `PORT=3002`
 
 **What it does:**
 - When set, the API binds Kestrel to `http://0.0.0.0:{PORT}` for container-friendly listening.
