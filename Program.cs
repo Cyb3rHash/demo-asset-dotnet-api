@@ -17,6 +17,42 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // -------------------------------
+// Kestrel listeners (HTTP + optional HTTPS)
+// -------------------------------
+//
+// Some preview/ingress setups connect to the container over HTTPS (upstream HTTPS) even though
+// TLS is also terminated at the edge. If the container only listens on HTTP, nginx can return 502.
+// To be robust, we:
+// - always enable HTTP on the expected PORT
+// - additionally enable HTTPS on the same PORT *when a dev cert is available*
+// - never fail startup if HTTPS cert is missing (fallback to HTTP-only)
+//
+// NOTE: For production, a real certificate should be provisioned via environment/secret mounting.
+var portStr = Environment.GetEnvironmentVariable("PORT");
+var listenPort = 3010;
+if (!string.IsNullOrWhiteSpace(portStr) && int.TryParse(portStr, out var parsedPort))
+{
+    listenPort = parsedPort;
+}
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Always listen on HTTP so local curl/health checks and HTTP-based proxies work.
+    options.ListenAnyIP(listenPort);
+
+    // Best-effort HTTPS: if no cert is available, we simply won't add the HTTPS endpoint.
+    try
+    {
+        options.ListenAnyIP(listenPort, listen => listen.UseHttps());
+    }
+    catch
+    {
+        // Swallow: in many container environments the dev cert is not present.
+        // HTTP will remain available on the configured port.
+    }
+});
+
+// -------------------------------
 // Services
 // -------------------------------
 
@@ -161,24 +197,9 @@ var app = builder.Build();
 // Host/port binding (container-friendly)
 // -------------------------------
 //
-// Preview/proxy environments commonly inject either:
-// - PORT (Heroku-style), or
-// - ASPNETCORE_URLS (ASP.NET style).
-//
-// If neither is set, we must still bind to the expected preview port (3010)
-// on 0.0.0.0 so the reverse proxy can reach the container.
-var port = Environment.GetEnvironmentVariable("PORT");
-var aspnetcoreUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
-
-if (!string.IsNullOrWhiteSpace(port))
-{
-    app.Urls.Add($"http://0.0.0.0:{port}");
-}
-else if (string.IsNullOrWhiteSpace(aspnetcoreUrls))
-{
-    // Default for this workspace's preview configuration.
-    app.Urls.Add("http://0.0.0.0:3010");
-}
+// NOTE: We configure Kestrel listeners explicitly above (HTTP + optional HTTPS) using PORT.
+// Therefore, we intentionally avoid mutating app.Urls here to prevent conflicts and ambiguity
+// when the host also sets ASPNETCORE_URLS.
 
 // -------------------------------
 // Middleware pipeline
