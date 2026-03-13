@@ -7,8 +7,10 @@ using DemoAssetDotnetApi.Domain.Errors;
 using DemoAssetDotnetApi.Infrastructure.Persistence;
 using FluentValidation;
 using Hellang.Middleware.ProblemDetails;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +31,10 @@ builder.Services.AddSingleton<DemoAssetDotnetApi.Application.Replication.Replica
 builder.Services.AddSingleton<IAssetService, AssetService>();
 
 builder.Services.AddHttpContextAccessor();
+
+// Health checks (ASP.NET Core standard).
+// Used by preview/proxy environments to determine container readiness/liveness.
+builder.Services.AddHealthChecks();
 
 builder.Services.AddControllers(options =>
     {
@@ -217,6 +223,26 @@ app.UseCors();
 
 // Controllers
 app.MapControllers();
+
+// Health check endpoint used by preview/proxy health probing.
+// Returns 200 when the app is running and can serve requests.
+app.MapHealthChecks("/healthz", new HealthCheckOptions
+    {
+        // No custom checks registered; this will report Healthy when the app is up.
+        // If checks are added later, this predicate ensures they are included by default.
+        Predicate = _ => true,
+        ResultStatusCodes =
+        {
+            [HealthStatus.Healthy] = StatusCodes.Status200OK,
+            [HealthStatus.Degraded] = StatusCodes.Status200OK,
+            [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+        }
+    })
+    .WithName("Healthz")
+    .WithSummary("Health check (proxy-ready)")
+    .WithDescription("ASP.NET Core health checks endpoint used for container readiness/liveness probes.")
+    .WithTags("System")
+    .WithOpenApi();
 
 // Minimal health check endpoint (kept).
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
