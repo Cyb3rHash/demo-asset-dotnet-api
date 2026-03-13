@@ -17,17 +17,30 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // -------------------------------
-// Kestrel listeners (HTTP + optional HTTPS)
+// Kestrel listeners (HTTPS on the preview port)
 // -------------------------------
 //
-// Some preview/ingress setups connect to the container over HTTPS (upstream HTTPS) even though
-// TLS is also terminated at the edge. If the container only listens on HTTP, nginx can return 502.
-// To be robust, we:
-// - always enable HTTP on the expected PORT
-// - additionally enable HTTPS on the same PORT *when a dev cert is available*
-// - never fail startup if HTTPS cert is missing (fallback to HTTP-only)
+// Failure signal:
+// - Local:  http://localhost:3010/healthz returns 200
+// - External preview: https://<host>:3010/healthz returns 502 (nginx), and http://<host>:3010 returns 400
+//   "plain HTTP request was sent to HTTPS port"
 //
-// NOTE: For production, a real certificate should be provisioned via environment/secret mounting.
+// Root cause:
+// The external preview edge expects TLS *to the container* on port 3010. If we only serve HTTP,
+// the edge cannot connect and returns 502.
+//
+// Contract (TLS listener flow):
+// - Input: PORT env var (string, optional). Defaults to 3010.
+// - Behavior: Bind HTTPS on 0.0.0.0:<PORT>.
+// - Cert: Prefer explicit env-provided certificate (path + password). If not provided, rely on the
+//   ASP.NET Core development certificate.
+// - Errors: If HTTPS cannot be bound, startup fails (so the platform reports the container unhealthy).
+//
+// IMPORTANT: We intentionally do NOT try to serve both HTTP and HTTPS on the same TCP port.
+// That is not reliably possible because protocol detection requires reading bytes that differ
+// between HTTP and TLS handshakes.
+//
+// NOTE: For production, mount a real cert and set the env vars below.
 var portStr = Environment.GetEnvironmentVariable("PORT");
 var listenPort = 3010;
 if (!string.IsNullOrWhiteSpace(portStr) && int.TryParse(portStr, out var parsedPort))
@@ -35,21 +48,25 @@ if (!string.IsNullOrWhiteSpace(portStr) && int.TryParse(portStr, out var parsedP
     listenPort = parsedPort;
 }
 
+// Optional certificate configuration via environment variables.
+// (Do not hardcode secrets or file paths.)
+var httpsCertPath = Environment.GetEnvironmentVariable("ASPNETCORE_Kestrel__Certificates__Default__Path");
+var httpsCertPassword = Environment.GetEnvironmentVariable("ASPNETCORE_Kestrel__Certificates__Default__Password");
+
 builder.WebHost.ConfigureKestrel(options =>
 {
-    // Always listen on HTTP so local curl/health checks and HTTP-based proxies work.
-    options.ListenAnyIP(listenPort);
-
-    // Best-effort HTTPS: if no cert is available, we simply won't add the HTTPS endpoint.
-    try
+    options.ListenAnyIP(listenPort, listen =>
     {
-        options.ListenAnyIP(listenPort, listen => listen.UseHttps());
-    }
-    catch
-    {
-        // Swallow: in many container environments the dev cert is not present.
-        // HTTP will remain available on the configured port.
-    }
+        // If explicit cert settings are provided, use them; otherwise rely on the dev certificate.
+        if (!string.IsNullOrWhiteSpace(httpsCertPath))
+        {
+            listen.UseHttps(httpsCertPath, httpsCertPassword);
+        }
+        else
+        {
+            listen.UseHttps();
+        }
+    });
 });
 
 // -------------------------------
@@ -197,7 +214,7 @@ var app = builder.Build();
 // Host/port binding (container-friendly)
 // -------------------------------
 //
-// NOTE: We configure Kestrel listeners explicitly above (HTTP + optional HTTPS) using PORT.
+// NOTE: We configure Kestrel listeners explicitly above (HTTPS) using PORT.
 // Therefore, we intentionally avoid mutating app.Urls here to prevent conflicts and ambiguity
 // when the host also sets ASPNETCORE_URLS.
 
