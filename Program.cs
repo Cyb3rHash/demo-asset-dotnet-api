@@ -150,13 +150,27 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// -------------------------------
+﻿// -------------------------------
 // Host/port binding (container-friendly)
 // -------------------------------
+//
+// Preview/proxy environments commonly inject either:
+// - PORT (Heroku-style), or
+// - ASPNETCORE_URLS (ASP.NET style).
+//
+// If neither is set, we must still bind to the expected preview port (3010)
+// on 0.0.0.0 so the reverse proxy can reach the container.
 var port = Environment.GetEnvironmentVariable("PORT");
+var aspnetcoreUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+
 if (!string.IsNullOrWhiteSpace(port))
 {
     app.Urls.Add($"http://0.0.0.0:{port}");
+}
+else if (string.IsNullOrWhiteSpace(aspnetcoreUrls))
+{
+    // Default for this workspace's preview configuration.
+    app.Urls.Add("http://0.0.0.0:3010");
 }
 
 // -------------------------------
