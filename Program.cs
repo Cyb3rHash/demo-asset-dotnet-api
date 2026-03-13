@@ -9,6 +9,7 @@ using FluentValidation;
 using Hellang.Middleware.ProblemDetails;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
@@ -196,6 +197,29 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+// Reverse proxy / ingress support.
+// Many preview environments terminate TLS at the proxy and forward requests over HTTP to Kestrel.
+// Without forwarded headers, ASP.NET Core may mis-detect scheme/host which can break redirects and URL generation.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
+};
+
+// In preview/CI environments we don't know proxy IPs ahead of time; clear defaults to accept forwarded headers.
+// NOTE: This should be tightened for production deployments where proxy networks are known.
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+
+app.UseForwardedHeaders(forwardedHeadersOptions);
+
+// Do NOT redirect HTTP->HTTPS inside the container by default.
+// The proxy/ingress typically handles HTTPS externally. Enforcing HTTPS here can cause redirect loops or bad gateway behavior.
+if (app.Environment.IsDevelopment())
+{
+    // Intentionally no HTTPS redirection in development/preview.
+    // app.UseHttpsRedirection();
+}
+
 // Correlation ID must be early, so logs and error envelopes always contain it.
 // REQ: REQ-002 - Correlation ID extraction/generation and propagation using X-Correlation-Id.
 app.UseMiddleware<CorrelationIdMiddleware>();
@@ -220,6 +244,21 @@ app.UseSwaggerUI(options =>
 
 // CORS must be in pipeline before endpoints
 app.UseCors();
+
+// Root endpoint: some ingress/proxy setups probe `/` by default.
+// Return 200 to avoid upstream being marked unhealthy (which can surface as 502).
+app.MapGet("/", () => Results.Ok(new
+    {
+        service = "demo-asset-dotnet-api",
+        status = "ok",
+        healthz = "/healthz",
+        swagger = "/swagger/index.html"
+    }))
+    .WithName("Root")
+    .WithSummary("Root endpoint (proxy-friendly)")
+    .WithDescription("Returns a simple 200 OK payload. Useful for preview/ingress health probing and quick verification.")
+    .WithTags("System")
+    .WithOpenApi();
 
 // Controllers
 app.MapControllers();
