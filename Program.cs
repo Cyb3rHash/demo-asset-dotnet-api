@@ -43,7 +43,6 @@ builder.Services.AddControllers()
 // FluentValidation integration.
 // REQ: REQ-004 - Validation pipeline returning standardized error envelope with tab + fieldPath.
 builder.Services.AddValidatorsFromAssemblyContaining<ManageSiteAssetsRequestValidator>();
-builder.Services.AddFluentValidationAutoValidation();
 
 // Request body limits (Kestrel + form features).
 // REQ: REQ-006 - Request limits / payload size limits as baseline hardening.
@@ -123,10 +122,7 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 
-    // Example payloads
-    options.ExampleFilters();
-
-    // Register example providers (kept local in API layer).
+    // Example payloads are provided via our local schema filter below (no external ExampleFilters dependency).
     options.SchemaFilter<SwaggerExamplesSchemaFilter>();
 });
 

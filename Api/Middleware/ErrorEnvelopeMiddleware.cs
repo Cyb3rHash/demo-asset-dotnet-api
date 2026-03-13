@@ -92,7 +92,9 @@ public sealed class ErrorEnvelopeMiddleware
         if (context.Response.HasStarted)
         {
             _logger.LogWarning(ex, "Response already started; cannot write error envelope.");
-            throw;
+
+            // We cannot write our envelope once the response has started; propagate the original exception.
+            throw ex;
         }
 
         var correlationId = context.Items.TryGetValue(CorrelationIdMiddleware.ItemKey, out var v) ? v?.ToString() : null;
