@@ -23,6 +23,25 @@ Open:
 - Swagger UI: `http://localhost:5024/swagger`
 - Health: `http://localhost:5024/health`
 
+## Run in cloud/container (one-shot script)
+If you're seeing a **502** and aren't sure what port the service is binding to, use:
+
+```bash
+cd demo-asset-dotnet-api
+./run-backend.sh
+```
+
+This script will:
+- print diagnostics (`dotnet --info`, working dir, env)
+- `dotnet restore`
+- `dotnet build -c Release`
+- `dotnet run` bound to `http://0.0.0.0:$PORT`
+
+Environment variables:
+- `PORT` (recommended; defaults to `8080` if not set)
+- `ASPNETCORE_ENVIRONMENT` (defaults to `Production`)
+- `PROJECT_FILE` (defaults to `DemoAssetDotnetApi.csproj`)
+
 ## Container-friendly port binding
 This API supports the common `PORT` environment variable.
 
