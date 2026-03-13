@@ -29,9 +29,13 @@ var builder = WebApplication.CreateBuilder(args);
 // The external preview edge expects TLS *to the container* on port 3010. If we only serve HTTP,
 // the edge cannot connect and returns 502.
 //
+// Additional cause we observed in logs:
+// - Kestrel may bind to an IPv6 AnyIP endpoint ([::]:3010). Some ingress environments cannot
+//   reliably connect to that listener and will return 502.
+//
 // Contract (TLS listener flow):
 // - Input: PORT env var (string, optional). Defaults to 3010.
-// - Behavior: Bind HTTPS on 0.0.0.0:<PORT>.
+// - Behavior: Bind HTTPS on 0.0.0.0:<PORT> (IPv4) to maximize reachability from preview ingress.
 // - Cert: Prefer explicit env-provided certificate (path + password). If not provided, rely on the
 //   ASP.NET Core development certificate.
 // - Errors: If HTTPS cannot be bound, startup fails (so the platform reports the container unhealthy).
@@ -55,7 +59,10 @@ var httpsCertPassword = Environment.GetEnvironmentVariable("ASPNETCORE_Kestrel__
 
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.ListenAnyIP(listenPort, listen =>
+    // IMPORTANT:
+    // Use an explicit IPv4 bind to avoid environments where ListenAnyIP resolves to IPv6 ([::])
+    // and the preview ingress cannot reach it reliably (causing 502).
+    options.Listen(System.Net.IPAddress.Any, listenPort, listen =>
     {
         // If explicit cert settings are provided, use them; otherwise rely on the dev certificate.
         if (!string.IsNullOrWhiteSpace(httpsCertPath))
