@@ -1,4 +1,3 @@
-using System.Net.Mime;
 using System.Text.Json;
 using DemoAssetDotnetApi.Api.Middleware;
 using DemoAssetDotnetApi.Api.OpenApi;
@@ -31,7 +30,11 @@ builder.Services.AddSingleton<IAssetService, AssetService>();
 
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+    {
+        // Capture model binding errors for consistent envelope formatting.
+        options.Filters.Add<ModelStateEnvelopeFilter>();
+    })
     .AddJsonOptions(options =>
     {
         // Keep contract stable and predictable.
@@ -43,7 +46,14 @@ builder.Services.AddControllers()
 // FluentValidation integration.
 // REQ: REQ-004 - Validation pipeline returning standardized error envelope with tab + fieldPath.
 builder.Services.AddValidatorsFromAssemblyContaining<ManageSiteAssetsRequestValidator>();
-builder.Services.AddFluentValidationAutoValidation();
+
+// NOTE: FluentValidation.AspNetCore integrates via MVC when registered.
+// Avoid AddFluentValidationAutoValidation() since it is not available with the current package set.
+builder.Services.AddFluentValidation(fv =>
+{
+    fv.DisableDataAnnotationsValidation = true;
+    fv.RegisterValidatorsFromAssemblyContaining<ManageSiteAssetsRequestValidator>();
+});
 
 // Request body limits (Kestrel + form features).
 // REQ: REQ-006 - Request limits / payload size limits as baseline hardening.
@@ -51,7 +61,7 @@ builder.Services.Configure<FormOptions>(o =>
 {
     o.MultipartBodyLengthLimit = 5 * 1024 * 1024; // 5 MB
 });
-builder.Services.Configure<RouteHandlerOptions>(o =>
+builder.Services.Configure<RouteHandlerOptions>(_ =>
 {
     // Placeholder for future endpoint-level limits if using minimal APIs.
 });
@@ -60,10 +70,10 @@ builder.Services.Configure<RouteHandlerOptions>(o =>
 // REQ: REQ-003 - Standardized error handling boundary with correlation ID.
 builder.Services.AddProblemDetails(options =>
 {
-    options.IncludeExceptionDetails = (ctx, ex) => builder.Environment.IsDevelopment();
+    options.IncludeExceptionDetails = (_, _) => builder.Environment.IsDevelopment();
 
     // Map known domain exceptions to HTTP status codes.
-    options.Map<DomainValidationException>((ctx, ex) =>
+    options.Map<DomainValidationException>((_, ex) =>
     {
         var pd = new ProblemDetails
         {
@@ -76,7 +86,7 @@ builder.Services.AddProblemDetails(options =>
         return pd;
     });
 
-    options.Map<DomainConflictException>((ctx, ex) =>
+    options.Map<DomainConflictException>((_, ex) =>
     {
         var pd = new ProblemDetails
         {
@@ -87,6 +97,22 @@ builder.Services.AddProblemDetails(options =>
         };
         pd.Extensions["category"] = ErrorCategory.Business.ToString();
         return pd;
+    });
+});
+
+// CORS (SPA-friendly)
+// REQ: CORS configured for the React SPA
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        // For the demo container, allow any origin. Tighten in production by configuring allowed origins.
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            // Expose correlation ID so browser clients can read it.
+            .WithExposedHeaders(CorrelationIdMiddleware.HeaderName);
     });
 });
 
@@ -122,9 +148,6 @@ builder.Services.AddSwaggerGen(options =>
             }
         }
     });
-
-    // Example payloads
-    options.ExampleFilters();
 
     // Register example providers (kept local in API layer).
     options.SchemaFilter<SwaggerExamplesSchemaFilter>();
@@ -179,6 +202,9 @@ app.UseSwaggerUI(options =>
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "Demo Asset .NET API v1");
     options.RoutePrefix = "swagger";
 });
+
+// CORS must be in pipeline before endpoints
+app.UseCors();
 
 // Controllers
 app.MapControllers();
