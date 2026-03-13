@@ -288,7 +288,7 @@ public sealed class RemoveSiteAssetRequest
     public string AssetId { get; set; } = string.Empty;
     public bool Confirm { get; set; }
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public DeleteMode? DeleteMode { get; set; } = DeleteMode.Soft;
+    public DeleteMode? DeleteMode { get; set; } = DemoAssetDotnetApi.Api.SiteAssets.DeleteMode.Soft;
     public string? Reason { get; set; }
 }
 

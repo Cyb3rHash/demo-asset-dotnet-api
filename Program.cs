@@ -45,15 +45,10 @@ builder.Services.AddControllers(options =>
 
 // FluentValidation integration.
 // REQ: REQ-004 - Validation pipeline returning standardized error envelope with tab + fieldPath.
+//
+// Register validators into DI. (MVC auto-validation is intentionally not wired here because the
+// AddFluentValidation* MVC extension methods are not available with the current package set.)
 builder.Services.AddValidatorsFromAssemblyContaining<ManageSiteAssetsRequestValidator>();
-
-// NOTE: FluentValidation.AspNetCore integrates via MVC when registered.
-// Avoid AddFluentValidationAutoValidation() since it is not available with the current package set.
-builder.Services.AddFluentValidation(fv =>
-{
-    fv.DisableDataAnnotationsValidation = true;
-    fv.RegisterValidatorsFromAssemblyContaining<ManageSiteAssetsRequestValidator>();
-});
 
 // Request body limits (Kestrel + form features).
 // REQ: REQ-006 - Request limits / payload size limits as baseline hardening.
