@@ -1,0 +1,175 @@
+@DemoAssetDotnetApi_HostAddress = http://localhost:5024
+
+### Health
+GET {{DemoAssetDotnetApi_HostAddress}}/health
+Accept: application/json
+
+### Create Asset (Add)
+POST {{DemoAssetDotnetApi_HostAddress}}/api/siteassets/managesiteassets
+Content-Type: application/json
+X-Correlation-Id: demo-corr-001
+
+{
+  "operation": "Add",
+  "siteId": "SITE-001",
+  "asset": {
+    "assetName": "Boiler 1",
+    "permitEuId": "EU-1001",
+    "globalUniqueAssetId": "GUID-ASSET-UNIQUE-001",
+    "statusLog": [
+      {
+        "operatingStatus": "Active",
+        "fromDate": "2025-01-01",
+        "comments": "Commissioned"
+      }
+    ],
+    "inputParameters": [
+      {
+        "name": "Fuel Flow",
+        "uomId": "UOM-001",
+        "reportingProgramIds": [ "RP-1" ],
+        "inputType": "Throughput",
+        "dataEntryFrequency": "Annual",
+        "inUse": true
+      }
+    ]
+  }
+}
+
+### List Assets (no deleted)
+GET {{DemoAssetDotnetApi_HostAddress}}/api/siteassets/getsiteassets?siteId=SITE-001&includeDeleted=false
+Accept: application/json
+X-Correlation-Id: demo-corr-002
+
+### Get Asset By Id (replace assetId after creating)
+GET {{DemoAssetDotnetApi_HostAddress}}/api/siteassets/getsiteassetbyid?siteId=SITE-001&assetId=b6f1e651-6ee2-4f13-9b32-27773d41ae85
+Accept: application/json
+X-Correlation-Id: demo-corr-004
+
+### Seed EF Source Mappings for source asset (replace assetId + inputParameterId)
+POST {{DemoAssetDotnetApi_HostAddress}}/api/inputefsourcemapping/manageinputefsourcemapping
+Content-Type: application/json
+X-Correlation-Id: demo-corr-ef-001
+
+{
+  "siteId": "SITE-001",
+  "assetId": "b6f1e651-6ee2-4f13-9b32-27773d41ae85",
+  "mappings": [
+    {
+      "inputParameterId": "INPUT-001",
+      "efSourceSet": "EPA",
+      "efSourceTable": "CO2_DEFAULTS",
+      "equationExpression": "EF * QTY",
+      "reportingProgramIds": [ "RP-1" ]
+    }
+  ]
+}
+
+### Seed Calculated Throughput Setup for source asset (replace assetId + inputParameterId)
+POST {{DemoAssetDotnetApi_HostAddress}}/api/calculatedthroughputequationsetup/managecalculatedinputparameters
+Content-Type: application/json
+X-Correlation-Id: demo-corr-thr-001
+
+{
+  "siteId": "SITE-001",
+  "reportingYear": 2025,
+  "equations": [
+    {
+      "assetId": "b6f1e651-6ee2-4f13-9b32-27773d41ae85",
+      "inputParameterId": "INPUT-001",
+      "masterEquationId": "EQ-THR-001",
+      "generatedEquation": "A * B",
+      "scalars": [
+        { "scalarType": "Constant", "scalarValue": 10.5 }
+      ]
+    }
+  ]
+}
+
+### Generate Throughput for input parameter (source asset)
+POST {{DemoAssetDotnetApi_HostAddress}}/api/calculatedthroughputequationsetup/generatethroughputforinputparameter
+Content-Type: application/json
+X-Correlation-Id: demo-corr-thr-gen-001
+
+{
+  "siteId": "SITE-001",
+  "assetId": "b6f1e651-6ee2-4f13-9b32-27773d41ae85",
+  "reportingYear": 2025,
+  "inputParameterId": "INPUT-001"
+}
+
+### Upsert minimal Data Input value (source asset)
+POST {{DemoAssetDotnetApi_HostAddress}}/api/datainput/upsertvalue
+Content-Type: application/json
+X-Correlation-Id: demo-corr-di-001
+
+{
+  "siteId": "SITE-001",
+  "assetId": "b6f1e651-6ee2-4f13-9b32-27773d41ae85",
+  "reportingYear": 2025,
+  "inputParameterId": "INPUT-001",
+  "value": 123.45
+}
+
+### Prepare Copy (replace sourceAssetId after creating)
+POST {{DemoAssetDotnetApi_HostAddress}}/api/siteassets/preparecopy
+Content-Type: application/json
+X-Correlation-Id: demo-corr-copy-prepare-001
+
+{
+  "siteId": "SITE-001",
+  "sourceAssetId": "b6f1e651-6ee2-4f13-9b32-27773d41ae85",
+  "reportingYear": 2025
+}
+
+### Copy Save (managesiteassets operation=Copy) - replication orchestrator runs after save
+POST {{DemoAssetDotnetApi_HostAddress}}/api/siteassets/managesiteassets
+Content-Type: application/json
+X-Correlation-Id: demo-corr-copy-save-001
+
+{
+  "operation": "Copy",
+  "idempotencyKey": "copy-SITE-001-b6f1e651-6ee2-4f13-9b32-27773d41ae85-v1",
+  "siteId": "SITE-001",
+  "asset": {
+    "assetName": "Boiler 1 (Copy)",
+    "permitEuId": "EU-1001-COPY",
+    "globalUniqueAssetId": "GUID-ASSET-UNIQUE-001-COPY",
+    "statusLog": [
+      {
+        "operatingStatus": "Active",
+        "fromDate": "2025-01-01",
+        "comments": "Copied from source"
+      }
+    ]
+  },
+  "copyMetadata": {
+    "sourceAssetId": "b6f1e651-6ee2-4f13-9b32-27773d41ae85",
+    "copyOperationId": "copyop-demo-001",
+    "copyTimestampUtc": "2026-03-13T00:00:00.0000000Z",
+    "copyPerformedBy": "demo.user@example.com"
+  }
+}
+
+### Verify EF Source Mappings replicated to target asset (replace targetAssetId returned by copy save)
+GET {{DemoAssetDotnetApi_HostAddress}}/api/inputefsourcemapping/getinputefsourcemappingforsite?siteId=SITE-001&assetId=c2f2ed27-7451-4c5d-bd6b-3bb1edb621b3
+Accept: application/json
+X-Correlation-Id: demo-corr-ef-verify-001
+
+### Verify Throughput Setup replicated to target asset (replace targetAssetId)
+GET {{DemoAssetDotnetApi_HostAddress}}/api/calculatedthroughputequationsetup/getcalculatedinputparametersforsite?siteId=SITE-001&reportingYear=2025&assetId=c2f2ed27-7451-4c5d-bd6b-3bb1edb621b3
+Accept: application/json
+X-Correlation-Id: demo-corr-thr-verify-001
+
+### Soft Delete Asset (replace assetId after creating)
+POST {{DemoAssetDotnetApi_HostAddress}}/api/siteassets/removesiteasset
+Content-Type: application/json
+X-Correlation-Id: demo-corr-005
+
+{
+  "siteId": "SITE-001",
+  "assetId": "b6f1e651-6ee2-4f13-9b32-27773d41ae85",
+  "confirm": true,
+  "deleteMode": "Soft",
+  "reason": "Demo cleanup"
+}
