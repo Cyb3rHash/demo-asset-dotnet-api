@@ -118,6 +118,7 @@ builder.Services.AddSwaggerGen(options =>
     options.EnableAnnotations();
     options.OperationFilter<CorrelationIdHeaderOperationFilter>();
     options.SchemaFilter<ValidationErrorDetailSchemaFilter>();
+    options.DocumentFilter<EnsureSchemaDocumentFilter>();
 
     // Standardized error envelope schema for swagger responses.
     options.MapType<ErrorResponse>(() => new OpenApiSchema
